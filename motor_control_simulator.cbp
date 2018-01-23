@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>
+<CodeBlocks_project_file>
+	<FileVersion major="1" minor="6" />
+	<Project>
+		<Option title="motor_control_simulator" />
+		<Option pch_mode="2" />
+		<Option compiler="gcc" />
+		<Build>
+			<Target title="Debug">
+				<Option output="bin/Debug/motor_control_simulator" prefix_auto="1" extension_auto="1" />
+				<Option object_output="obj/Debug/" />
+				<Option type="1" />
+				<Option compiler="gcc" />
+				<Compiler>
+					<Add option="-g" />
+				</Compiler>
+			</Target>
+			<Target title="Release">
+				<Option output="bin/Release/motor_control_simulator" prefix_auto="1" extension_auto="1" />
+				<Option object_output="obj/Release/" />
+				<Option type="1" />
+				<Option compiler="gcc" />
+				<Compiler>
+					<Add option="-O2" />
+				</Compiler>
+				<Linker>
+					<Add option="-s" />
+				</Linker>
+			</Target>
+		</Build>
+		<Compiler>
+			<Add option="-Wextra" />
+			<Add option="-Wall" />
+			<Add option="-fexceptions" />
+			<Add directory="src/sim_float" />
+			<Add directory="src/sim_fix" />
+		</Compiler>
+		<Unit filename="src/sim_fix/adc.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="src/sim_fix/divider.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="src/sim_fix/divider.h" />
+		<Unit filename="src/sim_fix/flux_obs.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="src/sim_fix/flux_obs.h" />
+		<Unit filename="src/sim_fix/h430_mul_mac.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="src/sim_fix/h430_mul_mac.h" />
+		<Unit filename="src/sim_fix/motor_control.h" />
+		<Unit filename="src/sim_fix/parameters.h" />
+		<Unit filename="src/sim_fix/park.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="src/sim_fix/park.h" />
+		<Unit filename="src/sim_fix/pi.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="src/sim_fix/pi.h" />
+		<Unit filename="src/sim_fix/pll.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="src/sim_fix/pll.h" />
+		<Unit filename="src/sim_fix/poly.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="src/sim_fix/scaling.h" />
+		<Unit filename="src/sim_fix/sqrt.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="src/sim_fix/sqrt.h" />
+		<Unit filename="src/sim_fix/structs.h" />
+		<Unit filename="src/sim_fix/svpwm.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="src/sim_fix/test_c.h" />
+		<Unit filename="src/sim_fix/test_fix_float_sim.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="src/sim_fix/test_fix_float_sim.h" />
+		<Unit filename="src/sim_fix/test_flux_obs.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="src/sim_fix/test_flux_obs.h" />
+		<Unit filename="src/sim_fix/test_motor_control.cpp" />
+		<Unit filename="src/sim_fix/test_mulmac.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="src/sim_fix/test_mulmac.h" />
+		<Unit filename="src/sim_fix/test_pi.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="src/sim_fix/test_pi.h" />
+		<Unit filename="src/sim_fix/test_pll.cpp" />
+		<Unit filename="src/sim_fix/test_pll.h" />
+		<Unit filename="src/sim_fix/test_poly.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="src/sim_fix/test_svpwm.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="src/sim_fix/trigonometry.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="src/sim_fix/trigonometry.h" />
+		<Unit filename="src/sim_float/Integrator.cpp" />
+		<Unit filename="src/sim_float/Integrator.h" />
+		<Unit filename="src/sim_float/Low_pass_filter1.cpp" />
+		<Unit filename="src/sim_float/Low_pass_filter1.h" />
+		<Unit filename="src/sim_float/inverter.cpp" />
+		<Unit filename="src/sim_float/inverter.h" />
+		<Unit filename="src/sim_float/main.cpp" />
+		<Unit filename="src/sim_float/pmsm.cpp" />
+		<Unit filename="src/sim_float/pmsm.h" />
+		<Unit filename="src/sim_float/test.cpp" />
+		<Unit filename="src/sim_float/test.h" />
+		<Extensions>
+			<code_completion />
+			<debugger />
+			<envvars />
+		</Extensions>
+	</Project>
+</CodeBlocks_project_file>
