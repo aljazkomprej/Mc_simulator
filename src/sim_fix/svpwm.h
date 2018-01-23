@@ -55,12 +55,22 @@ typedef int32_t s32;
 #define ADC_SAMPLE_CLK_CYCLES          ((u16) ( 0.166 * (double) F_CPU_MHZ ))                                                                  /**< duration of an ADC sample phase during phase current measurement [us], only used for calculation of measurement timings -> ADC_SAMPLE_EXTENSION_CLK_CYCLES does _not_ have an impact here! */
 #define ADC_CONVERSION_CLK_CYCLES      ((u16) ( 1.4375 * (double) F_CPU_MHZ ))                                                                 /**< duration of an AD conversion, until next conversion can be started [us] */
 
+#if 0
 /* single shunt */
 #define ADC_FIRST_PWM_EDGE        ((u16) ( 0 ))
 #define ADC_FIRST_CURRENT_SAMPLE  ((u16) ( ADC_GATE_DRIVER_PROPAGATION_DLY + PWM_DEADTIME_INITVAL + ADC_SAMPLE_DELAY_SHUNT_VOLTAGE ))
 #define ADC_SECOND_PWM_EDGE       ((u16) ( ADC_FIRST_CURRENT_SAMPLE - ADC_GATE_DRIVER_PROPAGATION_DLY + ADC_SAMPLE_CLK_CYCLES ))
 #define ADC_SECOND_CURRENT_SAMPLE ((u16) ( ADC_SECOND_PWM_EDGE + ADC_GATE_DRIVER_PROPAGATION_DLY + PWM_DEADTIME_INITVAL + ADC_SAMPLE_DELAY_SHUNT_VOLTAGE ))
 #define ADC_THIRD_PWM_EDGE        ((u16) ( ADC_SECOND_PWM_EDGE * 2u ))
+#else
+#define ADC_FIRST_PWM_EDGE        ((u16) ( 0 ))
+#define ADC_FIRST_CURRENT_SAMPLE  ((u16) ( 4.0 * (double) F_CPU_MHZ ))
+#define ADC_SECOND_PWM_EDGE       ((u16) ( 5.0 * (double) F_CPU_MHZ ))
+#define ADC_SECOND_CURRENT_SAMPLE ((u16) ( ADC_SECOND_PWM_EDGE +  ADC_FIRST_CURRENT_SAMPLE ))
+#define ADC_THIRD_PWM_EDGE        ((u16) ( ADC_SECOND_PWM_EDGE * 2u ))
+#endif // 0
+
+
 
 
 

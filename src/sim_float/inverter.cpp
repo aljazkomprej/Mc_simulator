@@ -8,8 +8,23 @@
 Inverter::Inverter()
 {
     uint16_t j;
+    double ua1,ua2,ua3,uavg0;
+
+    uavg0=(uavg[0]+uavg[1]+uavg[2])/3;
+    ua1=uavg[0]-uavg0;
+    ua2=uavg[1]-uavg0;
+    ua3=uavg[2]-uavg0;
 
     dfile.open("inverter.dat");
+    //print column name in first row
+    dfile << "time" << " ";     // 1
+    dfile << "i[0]" << " " << "i[1]" << " " << "i[2]" << " " ;  // 2 - 4
+    dfile << "u1" << " " << "u2" << " " << "u3" << " " ;         // 5 - 7
+    dfile << "e1" << " " << "e2" << " " << "e3" << " " ;          // 8 - 10
+    dfile << "meas.m[0]" << " " << "meas.m[1]" << " ";          // 11 - 12
+    dfile << "ua1" << " " << "ua2" << " " << "ua3" << " " ;   // 13 - 15
+    dfile << "iavg[0]" << " " << "iavg[1]" << " " << "iavg[2]" << " " ;   // 16 - 18
+    dfile  <<  std::endl;
 
     for(j=0;j<3;j++)
     {

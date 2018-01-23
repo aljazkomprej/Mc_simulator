@@ -1,6 +1,7 @@
 #include <iostream>
 #include <cmath>
 #include <fstream>
+#include <windows.h>
 
 #include "test.h"
 #include "Integrator.h"
@@ -117,8 +118,17 @@ void Test::Inverter_Test(void)
 
 
     ofile.open("inverter_slow.dat");
+    //print column names to first row
+    ofile << "inv.Get_Time()" <<" " << "ang" << " " << "duty_mag" << " " ;               //1-3
+    ofile << "u1" << " " << "u2" << " " << "u3" <<" ";                   //4-6
+    ofile << "inv.times_in.tu[0]" << " " << "inv.times_in.td[0]" << " ";              //7-8
+    ofile << "inv.times_in.tu[1]" << " " << "inv.times_in.td[1]" << " ";        //9-10
+    ofile << "inv.times_in.tu[2]" << " " << "inv.times_in.td[2]" << " ";        //11-12
+    ofile << "inv.times_in.m[0]" << " " << "inv.times_in.m[1]" << " ";    //13-14
+    ofile << "iu_fix" << " " << "iv_fix" << " " << "iw_fix" <<" "; //14-16
+    ofile << "mc_data.highest_phase" << " \n";
 
-    duty_mag=100;
+    duty_mag=1200;
 
     cout << "inverter test" << endl;
     inv.Set_Sampling_Time(Ts, pwm_divisions);
@@ -227,5 +237,6 @@ void Test::Inverter_Test(void)
     cout << "\nInverter test finished" << endl;
 
     ofile.close();
+    system("run_kst_plot.bat");
 
 }
