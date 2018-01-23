@@ -19,6 +19,7 @@
 //#include "errors.h"
 
 
+mc_data_t mc_data;
 svpwm_t sv;
 foc_ctrl_loop_data_t foc_data;
 
@@ -881,7 +882,7 @@ s16 math_cosine_unsafe(const u16 alpha)
   return math_sine_unsafe(alpha + (u16)(MATH_ANGLE_MAX / 4u));
 }
 
-#if 1
+#if 0
 void foc_svm_improved ( foc_ctrl_loop_data_t * foc_data, s16 a, s16 b, u16 svm_switch )
 {
   u16 V_TA;
@@ -930,7 +931,7 @@ void foc_svm_improved ( foc_ctrl_loop_data_t * foc_data, s16 a, s16 b, u16 svm_s
     foc_data->svm_length = (s16)((((s32) b) << 15) / math_sine_unsafe(foc_data->svm_phi));
   }
   #endif // 0
-
+  foc_data->svm_length = 500;
 
   /* in case of sector borders this defines the min. Null Vector duration **
    ** 10 ticks => 250ns@40MHz                                              **/
@@ -1012,7 +1013,7 @@ void foc_svm_improved ( foc_ctrl_loop_data_t * foc_data, s16 a, s16 b, u16 svm_s
   }
   else
   {
-#if 0
+#if 1
   Angle = (u32)foc_data->svm_phi*6u;
   mval = Angle>>16u;
   Sector = mval & 7u;
@@ -1030,16 +1031,16 @@ void foc_svm_improved ( foc_ctrl_loop_data_t * foc_data, s16 a, s16 b, u16 svm_s
 
     /* Calculate and limit times */
     /* RandVektor0 = Amp * sin(60 - gamma) */
-    //T1 = ( ( (u32) foc_data->svm_length ) * math_get_svm_sin60( (u16) ( 255u - Index ) ) ) >> 15u;
-    math_mulU16_unsafe( (u16) foc_data->svm_length, math_get_svm_sin60( (u16) ( 255u - Index ) ) );
+    T1 = ( ( (u32) foc_data->svm_length ) * math_get_svm_sin60( (u16) ( 255u - Index ) ) ) >> 15u;
+    /*math_mulU16_unsafe( (u16) foc_data->svm_length, math_get_svm_sin60( (u16) ( 255u - Index ) ) );
     math_mul_shiftright_result( 15u );
-    T1 = ( u16 ) math_mul_get_result();
+    T1 = ( u16 ) math_mul_get_result();*/
 
     /* RandVektor1 = Amp * sin(gamma) */
-    //T2 = ( ( (u32) foc_data->svm_length ) * math_get_svm_sin60( (u16) Index ) ) >> 15u;
-    math_mulU16_unsafe( (u16) foc_data->svm_length, math_get_svm_sin60( (u16) Index ) );
+    T2 = ( ( (u32) foc_data->svm_length ) * math_get_svm_sin60( (u16) Index ) ) >> 15u;
+    /*math_mulU16_unsafe( (u16) foc_data->svm_length, math_get_svm_sin60( (u16) Index ) );
     math_mul_shiftright_result( 15u );
-    T2 = ( u16 ) math_mul_get_result();
+    T2 = ( u16 ) math_mul_get_result();*/
 
     /*calc. mean value between T1 and T2*/
     Time = ( T1 + T2 ) >> 1u;
@@ -1221,7 +1222,7 @@ void foc_svm_improved ( foc_ctrl_loop_data_t * foc_data, s16 a, s16 b, u16 svm_s
         T13ValueDown = (u16) PWM_SINGLE_SHUNT_MAX_CMP_VAL - ( ( Compare0down + Compare2down ) >> 1u );
         break;
       }
-      default:                                                       /* case 5u: */
+      default:                                                      /* case 5u: */
       {
         Compare0up   = V_TB;
         Compare1up   = V_TA;
@@ -1386,3 +1387,196 @@ void mc_svm_extract_phase_currents( void )
    foc_data.svm_stored_sector = foc_data.svm_sector;
 
 }
+
+/*! @brief the ISR which prepares all input data for the FOC, executes the FOC and applies the output of the FOC to the various modules
+ *
+ * @details
+ * This is the heart of the whole application! It is executed when an ADC list has been finished but since the trigger points in the ADC lists <br>
+ * are PWM counter values, the execution is also synchronous to the output PWM. The execution of one ADC list always takes as long as one PWM <br>
+ * period, thus this ISR also executed with the frequency of the output PWM. This is also used to generate a timebase (module 'systime'). <br>
+ * It's no accident that the ISR is implemented right here, in module motor control, because it is teethed with the motor control state machine (see mc_main() ). <br>
+ * Since the this state machine has a timebase of one millisecond (and is NOT on interrupt level), the interactions between ISR and state machine are <br>
+ * very carefully woven. There are four flags (foc_enable, outputs_enable, meas_bemf, exec_speed_ctrl) which are ONLY read by the ISR and are ONLY written by the <br>
+ * state machine. You should also never use 'mc_data.state' for conditional expressions in the ISR (unless you _really_ know what you are doing there). <br>
+ * So, this is what's happening here (not necessarily in chronological order, since that can differ between single and dual shunt operation): <br>
+ * - increment 'systime' counter <br>
+ * - execute state machine for synchronizing to turning rotor <br>
+ * - set new ADC list (thereby (re)activating the ADC) <br>
+ * - retrieve recent phase current measurements <br>
+ * - pass current output voltages to module 'spdmeas' <br>
+ * - evaluate phase current offset/supply voltage measurements and update, if valid <br>
+ * - compute FOC algorithm <br>
+ * - apply FOC output voltages to PWM module (convert the FOC output to PWM compare values), thereby checking for over-/underflow <br>
+ * - execute UART data logger, if enabled <br>
+ * - execute speed controller, if enabled <br>
+ * - compute DC link current, if enabled <br>
+ * <br>
+ * One little reminder with regard to the PWM output: always keep in mind which shunt configuration you are currently working with! In single shunt mode, the falling <br>
+ * edges (pwm_c1) are at _fixed_ values at the beginning of the PWM period and the phase voltage is only produced by moving the rising edges (pwm_c0). In dual shunt mode, <br>
+ * both values change and they are symmetrical with regard to PWMMAX / 2 = 1200 (in case of an output frequency of 20 kHz). <br>
+ * <br>
+ * Note: there's loads of inline documentation in the source code. Read it.
+ */
+
+
+void mc_isr_handler ( int16_t u, int16_t v, int16_t w )
+{
+
+    /* the order of PWM thresholds (i.e. position in the space vector hexagon) is tracked for measuring the rotor speed */
+    /* supply voltage and current measurement offset value(s) are evaluated in the following block */
+    /* the actual, mathematical computation of the FOC algorithm... */
+    /* now configure the PWM output according to the results of the FOC computation */
+
+        /* ... and here, the measurement window is adaptive for maximizing the amplitude */
+        /* first off, determine the highest phase voltage; 300 .. 800ns -> 300ns except for 6 times per electrical revolutions (-> hexagon sector change) */
+
+
+ /* generate the literal number describing the phase voltage order */
+    int16_t cur_phase_voltage_order = 0u;
+    //int16_t last_phase_voltage_order;
+    uint16_t phase_voltage_pattern;
+
+    if( u < v ){cur_phase_voltage_order |= 1u; }
+    if( v < w ){cur_phase_voltage_order |= 2u; }
+    if( w < u ){cur_phase_voltage_order |= 4u; }
+
+     phase_voltage_pattern    = ( mc_data.last_phase_voltage_order << 3 ) | cur_phase_voltage_order;
+     mc_data.last_phase_voltage_order = cur_phase_voltage_order;
+
+
+          u8 loc_current_ph_volt_order = (u8) ( phase_voltage_pattern & (u16) 0x07 );
+
+          if(( 2u == loc_current_ph_volt_order ) || ( 3u == loc_current_ph_volt_order ))
+          {
+            mc_data.highest_phase = MC_PHASE_W;
+          }
+          else if(( 1u == loc_current_ph_volt_order ) || ( 5u == loc_current_ph_volt_order ))
+          {
+            mc_data.highest_phase = MC_PHASE_V;
+          }
+          else
+          {
+            mc_data.highest_phase = MC_PHASE_U;
+          }
+
+
+
+        /* now set the measurement window in a way that the highest phase voltage is the last falling edge of the measurement window */
+        int16_t loc_offset_u_rising, loc_offset_v_rising, loc_offset_w_rising;
+        uint16_t loc_cmp_u_falling, loc_cmp_v_falling, loc_cmp_w_falling;
+
+        if( MC_PHASE_U == mc_data.highest_phase )
+        {
+          /* order of falling edges: V -> W -> U */
+          loc_cmp_u_falling = ADC_THIRD_PWM_EDGE;
+          loc_cmp_v_falling = ADC_FIRST_PWM_EDGE;
+          loc_cmp_w_falling = ADC_SECOND_PWM_EDGE;
+
+          loc_offset_v_rising = (s16) ( ADC_SECOND_PWM_EDGE - ADC_FIRST_PWM_EDGE );
+          loc_offset_w_rising = 0;
+          loc_offset_u_rising = -(s16) ( ADC_THIRD_PWM_EDGE - ADC_SECOND_PWM_EDGE );
+        }
+        else if( MC_PHASE_V == mc_data.highest_phase )
+        {
+          /* order of falling edges: W -> U -> V */
+          loc_cmp_u_falling = ADC_SECOND_PWM_EDGE;
+          loc_cmp_v_falling = ADC_THIRD_PWM_EDGE;
+          loc_cmp_w_falling = ADC_FIRST_PWM_EDGE;
+
+          loc_offset_w_rising = (s16) ( ADC_SECOND_PWM_EDGE - ADC_FIRST_PWM_EDGE );
+          loc_offset_u_rising = 0;
+          loc_offset_v_rising = -(s16) ( ADC_THIRD_PWM_EDGE - ADC_SECOND_PWM_EDGE );
+        }
+        else                                                                                                                                                                /* if( MC_PHASE_W == mc_data.highest_phase ) */
+        {
+          /* order of falling edges: U -> V -> W */
+          loc_cmp_u_falling = ADC_FIRST_PWM_EDGE;
+          loc_cmp_v_falling = ADC_SECOND_PWM_EDGE;
+          loc_cmp_w_falling = ADC_THIRD_PWM_EDGE;
+
+          loc_offset_u_rising = (s16) ( ADC_SECOND_PWM_EDGE - ADC_FIRST_PWM_EDGE );
+          loc_offset_v_rising = 0;
+          loc_offset_w_rising = -(s16) ( ADC_THIRD_PWM_EDGE - ADC_SECOND_PWM_EDGE );
+        }
+
+      /* don't get confused -> the higher the voltage value, the lower is the compare value (because the compare value describes the rising edge and the counter is running forward...) */
+      /* the second term of this subtraction describes the offsets for the measurement windows which have been created with the falling edges -> compensate them with the rising edges */
+      mc_data.pwm0_cmp_val = (s16) ( PWM_SINGLE_SHUNT_CMP_MEDIAN ) - u - loc_offset_u_rising;
+      mc_data.min_cmp_val  = mc_data.pwm0_cmp_val;
+      mc_data.max_cmp_val  = mc_data.pwm0_cmp_val;
+
+      mc_data.pwm1_cmp_val = (s16) ( PWM_SINGLE_SHUNT_CMP_MEDIAN ) - v - loc_offset_v_rising;
+      if( mc_data.pwm1_cmp_val < mc_data.min_cmp_val ){mc_data.min_cmp_val = mc_data.pwm1_cmp_val; }
+      if( mc_data.pwm1_cmp_val > mc_data.max_cmp_val ){mc_data.max_cmp_val = mc_data.pwm1_cmp_val; }
+
+      mc_data.pwm2_cmp_val = (s16) ( PWM_SINGLE_SHUNT_CMP_MEDIAN ) - w - loc_offset_w_rising;
+      if( mc_data.pwm2_cmp_val < mc_data.min_cmp_val ){mc_data.min_cmp_val = mc_data.pwm2_cmp_val; }
+      if( mc_data.pwm2_cmp_val > mc_data.max_cmp_val ){mc_data.max_cmp_val = mc_data.pwm2_cmp_val; }
+
+      /* check if compare values violate their limits (which are imposed by the PWM module and the ADC current measurements) */
+      if( mc_data.min_cmp_val < (s16) PWM_SINGLE_SHUNT_MIN_CMP_VAL )
+      {
+        s16 loc_underflow_ticks = (s16) PWM_SINGLE_SHUNT_MIN_CMP_VAL - mc_data.min_cmp_val;
+
+        mc_data.pwm0_cmp_val += loc_underflow_ticks;
+        if( mc_data.pwm0_cmp_val > (s16) ( PWM_SINGLE_SHUNT_MAX_CMP_VAL )){mc_data.pwm0_cmp_val = (s16) ( PWM_SINGLE_SHUNT_MAX_CMP_VAL ); mc_data.pwm_cmp_val_overflow_flag = true; }
+
+        mc_data.pwm1_cmp_val += loc_underflow_ticks;
+        if( mc_data.pwm1_cmp_val > (s16) ( PWM_SINGLE_SHUNT_MAX_CMP_VAL )){mc_data.pwm1_cmp_val = (s16) ( PWM_SINGLE_SHUNT_MAX_CMP_VAL ); mc_data.pwm_cmp_val_overflow_flag = true; }
+
+        mc_data.pwm2_cmp_val += loc_underflow_ticks;
+        if( mc_data.pwm2_cmp_val > (s16) ( PWM_SINGLE_SHUNT_MAX_CMP_VAL )){mc_data.pwm2_cmp_val = (s16) ( PWM_SINGLE_SHUNT_MAX_CMP_VAL ); mc_data.pwm_cmp_val_overflow_flag = true; }
+      }
+      else if( mc_data.max_cmp_val > (s16) ( PWM_SINGLE_SHUNT_MAX_CMP_VAL ))
+      {
+        s16 loc_overflow_ticks = mc_data.max_cmp_val - (s16) PWM_SINGLE_SHUNT_MAX_CMP_VAL;
+
+        mc_data.pwm0_cmp_val -= loc_overflow_ticks;
+        if( mc_data.pwm0_cmp_val < (s16) ( PWM_SINGLE_SHUNT_MIN_CMP_VAL )){mc_data.pwm0_cmp_val = (s16) ( PWM_SINGLE_SHUNT_MIN_CMP_VAL ); mc_data.pwm_cmp_val_overflow_flag = true; }
+
+        mc_data.pwm1_cmp_val -= loc_overflow_ticks;
+        if( mc_data.pwm1_cmp_val < (s16) ( PWM_SINGLE_SHUNT_MIN_CMP_VAL )){mc_data.pwm1_cmp_val = (s16) ( PWM_SINGLE_SHUNT_MIN_CMP_VAL ); mc_data.pwm_cmp_val_overflow_flag = true; }
+
+        mc_data.pwm2_cmp_val -= loc_overflow_ticks;
+        if( mc_data.pwm2_cmp_val < (s16) ( PWM_SINGLE_SHUNT_MIN_CMP_VAL )){mc_data.pwm2_cmp_val = (s16) ( PWM_SINGLE_SHUNT_MIN_CMP_VAL ); mc_data.pwm_cmp_val_overflow_flag = true; }
+      }
+
+
+        /* set c0 reload values for next rising edges (after CNT has reached 0 again...) */
+//        pwm_set_c0_reload_values((u16) mc_data.pwm0_cmp_val, (u16) mc_data.pwm1_cmp_val, (u16) mc_data.pwm2_cmp_val );
+
+        /* setting measurement window */
+//
+    mc_data.pwm0_dwn_val=loc_cmp_u_falling;
+    mc_data.pwm1_dwn_val=loc_cmp_v_falling;
+    mc_data.pwm2_dwn_val=loc_cmp_w_falling;
+}
+
+
+void mc_current_calc (void)
+{
+   int16_t im1 = ( (s16) adc.i1_digits - IOFFSET  );
+   int16_t im2 = ( IOFFSET  - (s16) adc.i2_digits );
+        if( MC_PHASE_U == mc_data.highest_phase )  //U=1
+        {
+          /* order of falling edges: V -> W -> U: i1 = -i_v, i2 = i_u */
+          adc.iv.value=im1; //( mc_data.curr1_offset_val - (s16) adc_get_data()->phase_curr1 );
+          adc.iu.value=im2; //((s16) adc_get_data()->phase_curr2 - mc_data.curr1_offset_val );
+          adc.iw.value=-(adc.iv.value + adc.iu.value);
+        }
+        else if( MC_PHASE_V == mc_data.highest_phase ) //V=2
+        {
+          /* order of falling edges: W -> U -> V: i1 = -i_w, i2 = i_v */
+          adc.iw.value=im1; //( mc_data.curr1_offset_val - (s16) adc_get_data()->phase_curr1 );
+          adc.iv.value=im2; //((s16) adc_get_data()->phase_curr2 - mc_data.curr1_offset_val );
+          adc.iu.value=-(adc.iv.value + adc.iw.value);
+        }
+        else                                                                                                                                                                /* if( MC_PHASE_W == mc_data.highest_phase ) */
+        {
+          /* order of falling edges: U -> V -> W: i1 = -i_u, i2 = i_w */
+          adc.iu.value=im1;  //( mc_data.curr1_offset_val - (s16) adc_get_data()->phase_curr1 );
+          adc.iw.value=im2;  //((s16) adc_get_data()->phase_curr2 - mc_data.curr1_offset_val );
+          adc.iv.value=-(adc.iw.value + adc.iu.value);
+        }
+}
+

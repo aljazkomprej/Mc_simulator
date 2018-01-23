@@ -1,7 +1,6 @@
 #include <iostream>
 #include <cmath>
 #include <fstream>
-#include <windows.h>
 
 #include "test.h"
 #include "Integrator.h"
@@ -104,21 +103,22 @@ void Test::Inverter_Test(void)
     double Ls=30e-6;
     int32_t i;
     double time;
-    uint16_t pwm_divisions=2400;
+    uint16_t pwm_divisions= PWM_PERIOD_DURATION_TICKS;
     //static times_in_t times_in;
     bemf_t bemf;
     //inv_measurement_t meas;
-    complex16_t duty;
+//    complex16_t duty;
+    int16_t u1,u2,u3;
     uint16_t duty_mag;
     double ang;
+
     ofstream ofile;
     //static svpwm_t sv;
 
 
     ofile.open("inverter_slow.dat");
 
-    duty_mag=500;
-    foc_data.svm_length=duty_mag;
+    duty_mag=100;
 
     cout << "inverter test" << endl;
     inv.Set_Sampling_Time(Ts, pwm_divisions);
@@ -134,11 +134,16 @@ void Test::Inverter_Test(void)
         time=i*Ts;
         ang=time*40.*10+0.0;
 
-
-        duty.re=duty_mag*cos(ang);
-        duty.im=duty_mag*sin(ang);
-
+        u1=duty_mag*cos(ang+0);
+        u2=duty_mag*cos(ang+2.*3.14/3.);
+        u3=duty_mag*cos(ang-2.*3.14/3.);
 #if 0
+//old
+        //duty.re=duty_mag*cos(ang);
+        //duty.im=duty_mag*sin(ang);
+
+
+
         svpwm_sscm(&sv, &duty);
 
         inv.times_in.tu[0]=sv.t1up;
@@ -150,8 +155,10 @@ void Test::Inverter_Test(void)
 
         inv.times_in.m[0]=sv.m1;
         inv.times_in.m[1]=sv.m2;
-#else
+
+//v1.0
         foc_svm_improved ( &foc_data, duty.re, duty.im, 1 );
+
 
         inv.times_in.tu[0]=foc_data.svm_t0_up;
         inv.times_in.tu[1]=foc_data.svm_t1_up;
@@ -162,56 +169,63 @@ void Test::Inverter_Test(void)
 
         inv.times_in.m[0]=foc_data.svm_i1_samp_time_up;
         inv.times_in.m[1]=foc_data.svm_i2_samp_time_down;
+#else
+
+        mc_isr_handler(u1,u2,u3);
+        inv.times_in.tu[0]=mc_data.pwm0_cmp_val;
+        inv.times_in.tu[1]=mc_data.pwm1_cmp_val;
+        inv.times_in.tu[2]=mc_data.pwm2_cmp_val;
+        inv.times_in.td[2]=mc_data.pwm2_dwn_val;
+        inv.times_in.td[1]=mc_data.pwm1_dwn_val;
+        inv.times_in.td[0]=mc_data.pwm0_dwn_val;
+
+        inv.times_in.m[0]=ADC_FIRST_CURRENT_SAMPLE;
+        inv.times_in.m[1]=ADC_SECOND_CURRENT_SAMPLE;
 #endif
 
-
 #define BEMF_K 0.0002
-        bemf.e1=BEMF_K*duty.re;
-        bemf.e2=BEMF_K*(-duty.re/2+sqrt(3)/2*duty.im);
-        bemf.e3=BEMF_K*(-duty.re/2-sqrt(3)/2*duty.im);
+        bemf.e1=BEMF_K*u1;
+        bemf.e2=BEMF_K*u2;
+        bemf.e3=BEMF_K*u3;
 
         inv.Calculate_PWM_Cycle(&bemf);
 
-#define IOFFSET 2048
+#define IOFFSET 2048 //offset A/D pretvornika
 #define KMEAS 10
         adc.i1_digits=IOFFSET + KMEAS*inv.meas.m[0];
         adc.i2_digits=IOFFSET + KMEAS*inv.meas.m[1];
 
 #if 0
         CalculateCurrentsSingleShunt();
-#else
         mc_svm_extract_phase_currents();
+#else
+        mc_current_calc();
 #endif
         //adc.iu.adc_digits=adc.i1_digits;
         //calculate_adc_quantity(&adc.iu);
         //calculate_adc_quantity(&adc.iv);
 
-#if 0
         iu_fix=((int32_t)adc.iu.value*adc.iu.gain)>>10;
         iv_fix=((int32_t)adc.iv.value*adc.iv.gain)>>10;
         iw_fix=((int32_t)adc.iw.value*adc.iu.gain)>>10;
-#else
-        iu_fix=adc.iu.value;
-        iv_fix=adc.iv.value;
-        iw_fix=adc.iw.value;
-#endif
 
         //iu=iu_fix*In/32767;
 
-        printf("%+6d %+6d %+6d \n",adc.iu.value,adc.iv.value,adc.iw.value);
-        ofile << inv.Get_Time() << " " << foc_data.svm_stored_sector << " " ;               //1-2
-        ofile << inv.times_in.m[0] << " " << inv.times_in.m[1] << " " << sv.m_udc << " ";   //3-5
-        ofile << inv.times_in.tu[0] << " " << inv.times_in.td[0] << " ";              //6-7
-        ofile << inv.times_in.tu[1] << " " << inv.times_in.td[1] << " ";        //8-9
-        ofile << inv.times_in.tu[2] << " " << inv.times_in.td[2] << " ";        //10-11
-       // ofile << adc.iu.value << " " << adc.iv.value << " " << adc.iw.value <<" "; //12-14
-        ofile << iu_fix << " " << iv_fix << " " << iw_fix <<" "; //12-14
-        ofile << ang << " " << duty.re << " " << duty.im <<" "<< time <<" "<< foc_data.svm_phi <<" "<< foc_data.svm_length << "\n";  //15-19
+        //printf("%+6d %+6d %+6d \n",adc.iu.value,adc.iv.value,adc.iw.value);
+        printf("%+6d %+6f %+6d %+6d %+6d \n",i, ang,u1,u2,u3);
+        ofile << inv.Get_Time() <<" " << ang << " " << duty_mag << " " ;               //1-3
+        ofile << u1 << " " << u2 << " " << u3 <<" ";                   //4-6
+        ofile << inv.times_in.tu[0] << " " << inv.times_in.td[0] << " ";              //7-8
+        ofile << inv.times_in.tu[1] << " " << inv.times_in.td[1] << " ";        //9-10
+        ofile << inv.times_in.tu[2] << " " << inv.times_in.td[2] << " ";        //11-12
+        ofile << inv.times_in.m[0] << " " << inv.times_in.m[1] << " ";    //13-14
+        ofile << iu_fix << " " << iv_fix << " " << iw_fix <<" "; //14-16
+        ofile << mc_data.highest_phase << " \n";
 
 
     }
     cout << "\nInverter test finished" << endl;
 
     ofile.close();
-    system("run_octave_script.bat");
+
 }

@@ -11,7 +11,7 @@ typedef struct
 {
     int16_t kp;
     int16_t ki;
-  
+
     /** \brief Pi regulator, which control the phase of input signal and output signal to zero. */
     pi_regulator_t pi;
 
@@ -37,5 +37,6 @@ void pll_gain_reinit(pll_t *pll, uint16_t kp, uint16_t ki);
 #ifdef __cplusplus
 }
 #endif
+
 
 #endif

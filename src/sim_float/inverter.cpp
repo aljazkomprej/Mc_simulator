@@ -142,7 +142,8 @@ void Inverter::Calculate_PWM_Cycle(const bemf_t *bemf)
         // calculate phase voltages
         for(k=0; k<3; k++)  // calculate phase voltage for each individual phase
         {
-            if(( step < times_in.tu[k] ) || (step >=times_in.td[k] ) )
+            //if(( step < times_in.tu[k] ) || (step >=times_in.td[k] ) ) //times_in.tu before times_in.td
+            if(( step < times_in.tu[k] ) && (step > times_in.td[k] ) )  //times_in.td before times_in.tu
             {
                 ss[k]=0;
             }

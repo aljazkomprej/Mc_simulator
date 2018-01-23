@@ -1,6 +1,13 @@
 /* motor_control.h DD20151116 */
 
+#ifndef MOTOR_CONTROL_H
+#define MOTOR_CONTROL_H
 
+//#include "saradc_ctrl_bf.h"
+
+#include "structs.h"
+#include "pi.h"
+#include "pll.h"
 
 /**
  * @defgroup MCONTROL Motor control
@@ -23,14 +30,6 @@
  * @}
  */
 
-#ifndef MOTOR_CONTROL_H
-#define MOTOR_CONTROL_H
-
-//#include "saradc_ctrl_bf.h"
-
-#include "structs.h"
-#include "pi.h"
-#include "pll.h"
 
 typedef struct
 {

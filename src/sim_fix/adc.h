@@ -43,6 +43,7 @@ typedef struct
   /** \brief V phase current. */
   adc_quantity_t iv;
 
+  /** \brief W phase current. */
   adc_quantity_t iw;
 
   /** \brief DC link voltage. */
