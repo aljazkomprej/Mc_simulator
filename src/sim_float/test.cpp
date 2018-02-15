@@ -9,7 +9,11 @@
 #include "pmsm.h"
 #include "inverter.h"
 #include "svpwm.h"
+#include "OEsvpwm.h"
 #include "adc.h"
+
+// define which modulator would you like to simulate
+
 
 using namespace std;
 
@@ -100,11 +104,13 @@ void Test::Inverter_Test(void)
 {
 
     double Ts=50e-6;
-    double Rs=0.1;
-    double Ls=30e-6;
+    double Rs=0.2;
+    double Ls=40e-6;
     int32_t i;
     double time;
+#if ELMOSmod == 1U
     uint16_t pwm_divisions= PWM_PERIOD_DURATION_TICKS;
+#endif // ELMOSmod
     //static times_in_t times_in;
     bemf_t bemf;
     //inv_measurement_t meas;
@@ -112,105 +118,92 @@ void Test::Inverter_Test(void)
     int16_t u1,u2,u3;
     uint16_t duty_mag;
     double ang;
-
+#if OEmod == 1U
+    uint16_t pwm_divisions= 1200;
+    extern DutyCycle_t DutyCycle;
+    extern uint16_t u16_SpaceVectorAngle;                   /*!< Space vector angle */
+    extern uint16_t u16_SpaceVectorABS;
+#endif
     ofstream ofile;
     //static svpwm_t sv;
-
+#if ELMOSmod == 1U //duty_mag<1.000 !
+    duty_mag=1000;
+#endif
+#if OEmod == 1U // duty_mag<28.543 !
+    duty_mag=28500;
+    inv.CNT_mode=3U;
+    inv.middle_rl=1U;
+#endif
 
     ofile.open("inverter_slow.dat");
     //print column names to first row
-    ofile << "inv.Get_Time()" <<" " << "ang" << " " << "duty_mag" << " " ;               //1-3
+    ofile << "time" <<" " << "ang" << " " << "duty_mag" << " " ;               //1-3
     ofile << "u1" << " " << "u2" << " " << "u3" <<" ";                   //4-6
     ofile << "inv.times_in.tu[0]" << " " << "inv.times_in.td[0]" << " ";              //7-8
     ofile << "inv.times_in.tu[1]" << " " << "inv.times_in.td[1]" << " ";        //9-10
     ofile << "inv.times_in.tu[2]" << " " << "inv.times_in.td[2]" << " ";        //11-12
     ofile << "inv.times_in.m[0]" << " " << "inv.times_in.m[1]" << " ";    //13-14
     ofile << "iu_fix" << " " << "iv_fix" << " " << "iw_fix" <<" "; //14-16
+    ofile << "inv.uavg[0]" << " " << "inv.uavg[1]" << " " << "inv.uavg[2]" <<" "; //17-19
     ofile << "mc_data.highest_phase" << " \n";
-
-    duty_mag=1200;
 
     cout << "inverter test" << endl;
     inv.Set_Sampling_Time(Ts, pwm_divisions);
     inv.Set_Parameters(Rs, Rs, Rs, Ls, Ls, Ls);
 
-    init_svpwm(&sv, pwm_divisions);
-    init_adc_variables();
+//    init_svpwm(&sv, pwm_divisions);
+//    init_adc_variables();
 
     for(i=1;i<=350;i++)
     {
         int16_t iu_fix,iv_fix,iw_fix;
 
-        time=i*Ts;
-        ang=time*40.*10+0.0;
+        time=i*Ts; //time in seconds
+        ang=time*40.*10+0.0; //angle in radians
 
+        //calculate the reference voltage from magnitude and angle
         u1=duty_mag*cos(ang+0);
-        u2=duty_mag*cos(ang+2.*3.14/3.);
-        u3=duty_mag*cos(ang-2.*3.14/3.);
-#if 0
-//old
-        //duty.re=duty_mag*cos(ang);
-        //duty.im=duty_mag*sin(ang);
+        u2=duty_mag*cos(ang-2.*3.14/3.);
+        u3=duty_mag*cos(ang+2.*3.14/3.);
+#define BEMF_K 0.00015
+        bemf.e1=-BEMF_K*u1;
+        bemf.e2=-BEMF_K*u2;
+        bemf.e3=-BEMF_K*u3;
+
+/* test of Online Engineering modulation */
+        u16_SpaceVectorABS=duty_mag;
+        //ang is type double and is in radians, u16_SpaceVectorAngle uses whole range
+        u16_SpaceVectorAngle=uint16_t(ang*10430); //10430 for trasformation of ang(double) to Angle(uint16_t)
+        FOC_SVM(); // calculates duty ratio from magnitude and angle (u16_SpaceVectorABS,u16_SpaceVectorAngle)
+        PWMN_CalcDutyCycle(); //modifies duty ratio for current measurements
+        /* OUTPUTS
+        DutyCycle.u16_PhAnext; - Duty ratio for phase A ( equals PWM compare value )
+        DutyCycle.u16_PhBnext; - Duty ratio for phase B ( equals PWM compare value )
+        DutyCycle.u16_PhCnext; - Duty ratio for phase C ( equals PWM compare value )
+        DutyCycle.u16_CurrentTrigger1;
+        DutyCycle.u16_CurrentTrigger2;
+        */
+        inv.times_in.tu[0]=DutyCycle.u16_PhAnext;
+        inv.times_in.tu[1]=DutyCycle.u16_PhBnext;
+        inv.times_in.tu[2]=DutyCycle.u16_PhCnext;
+        inv.times_in.td[0]=DutyCycle.u16_PhAmodify;
+        inv.times_in.td[1]=DutyCycle.u16_PhBmodify;
+        inv.times_in.td[2]=DutyCycle.u16_PhCmodify;
+        inv.times_in.m[0]=DutyCycle.u16_CurrentTrigger1;
+        inv.times_in.m[1]=DutyCycle.u16_CurrentTrigger2;
 
 
 
-        svpwm_sscm(&sv, &duty);
-
-        inv.times_in.tu[0]=sv.t1up;
-        inv.times_in.tu[1]=sv.t2up;
-        inv.times_in.tu[2]=sv.t3up;
-        inv.times_in.td[2]=sv.t3down;
-        inv.times_in.td[1]=sv.t2down;
-        inv.times_in.td[0]=sv.t1down;
-
-        inv.times_in.m[0]=sv.m1;
-        inv.times_in.m[1]=sv.m2;
-
-//v1.0
-        foc_svm_improved ( &foc_data, duty.re, duty.im, 1 );
-
-
-        inv.times_in.tu[0]=foc_data.svm_t0_up;
-        inv.times_in.tu[1]=foc_data.svm_t1_up;
-        inv.times_in.tu[2]=foc_data.svm_t2_up;
-        inv.times_in.td[2]=foc_data.svm_t2_down;
-        inv.times_in.td[1]=foc_data.svm_t1_down;
-        inv.times_in.td[0]=foc_data.svm_t0_down;
-
-        inv.times_in.m[0]=foc_data.svm_i1_samp_time_up;
-        inv.times_in.m[1]=foc_data.svm_i2_samp_time_down;
-#else
-
-        mc_isr_handler(u1,u2,u3);
-        inv.times_in.tu[0]=mc_data.pwm0_cmp_val;
-        inv.times_in.tu[1]=mc_data.pwm1_cmp_val;
-        inv.times_in.tu[2]=mc_data.pwm2_cmp_val;
-        inv.times_in.td[2]=mc_data.pwm2_dwn_val;
-        inv.times_in.td[1]=mc_data.pwm1_dwn_val;
-        inv.times_in.td[0]=mc_data.pwm0_dwn_val;
-
-        inv.times_in.m[0]=ADC_FIRST_CURRENT_SAMPLE;
-        inv.times_in.m[1]=ADC_SECOND_CURRENT_SAMPLE;
-#endif
-
-#define BEMF_K 0.0002
-        bemf.e1=BEMF_K*u1;
-        bemf.e2=BEMF_K*u2;
-        bemf.e3=BEMF_K*u3;
-
-        inv.Calculate_PWM_Cycle(&bemf);
+        inv.Calculate_PWM_Cycle(&bemf); //calculates average phase voltages in PWM cycle and currents
 
 #define IOFFSET 2048 //offset A/D pretvornika
 #define KMEAS 10
         adc.i1_digits=IOFFSET + KMEAS*inv.meas.m[0];
         adc.i2_digits=IOFFSET + KMEAS*inv.meas.m[1];
 
-#if 0
-        CalculateCurrentsSingleShunt();
-        mc_svm_extract_phase_currents();
-#else
+
         mc_current_calc();
-#endif
+
         //adc.iu.adc_digits=adc.i1_digits;
         //calculate_adc_quantity(&adc.iu);
         //calculate_adc_quantity(&adc.iv);
@@ -222,16 +215,16 @@ void Test::Inverter_Test(void)
         //iu=iu_fix*In/32767;
 
         //printf("%+6d %+6d %+6d \n",adc.iu.value,adc.iv.value,adc.iw.value);
-        printf("%+6d %+6f %+6d %+6d %+6d \n",i, ang,u1,u2,u3);
-        ofile << inv.Get_Time() <<" " << ang << " " << duty_mag << " " ;               //1-3
+        printf("%+6d %+6f %+6d %+6d %+6d %+6d %+6d\n",i, ang,u1,u2,u3,inv.times_in.tu[0],inv.times_in.td[0]);
+        ofile << time <<" " << ang << " " << duty_mag << " " ;               //1-3
         ofile << u1 << " " << u2 << " " << u3 <<" ";                   //4-6
         ofile << inv.times_in.tu[0] << " " << inv.times_in.td[0] << " ";              //7-8
         ofile << inv.times_in.tu[1] << " " << inv.times_in.td[1] << " ";        //9-10
         ofile << inv.times_in.tu[2] << " " << inv.times_in.td[2] << " ";        //11-12
         ofile << inv.times_in.m[0] << " " << inv.times_in.m[1] << " ";    //13-14
-        ofile << iu_fix << " " << iv_fix << " " << iw_fix <<" "; //14-16
+        ofile << iu_fix << " " << iv_fix << " " << iw_fix <<" "; //15-17
+        ofile << inv.uavg[0] << " " << inv.uavg[1] << " " << inv.uavg[2] <<" "; //18-20
         ofile << mc_data.highest_phase << " \n";
-
 
     }
     cout << "\nInverter test finished" << endl;

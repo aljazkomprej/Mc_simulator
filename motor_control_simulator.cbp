@@ -35,6 +35,10 @@
 			<Add directory="src/sim_float" />
 			<Add directory="src/sim_fix" />
 		</Compiler>
+		<Unit filename="src/sim_fix/OEsvpwm.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="src/sim_fix/OEsvpwm.h" />
 		<Unit filename="src/sim_fix/adc.c">
 			<Option compilerVar="CC" />
 		</Unit>

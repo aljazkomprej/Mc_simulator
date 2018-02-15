@@ -3,6 +3,9 @@
 
 #include "Integrator.h"
 
+#define OEmod 1U //Online Engineering modulator
+#define ELMOSmod 0U //ELMOS modulator
+
 class Test
 {
     public:

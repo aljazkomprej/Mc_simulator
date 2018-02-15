@@ -44,7 +44,10 @@ class Inverter
         double Get_Time(void);
         inv_measurement_t meas;
         times_in_t times_in;
-
+        double uavg[3];     // average value of the voltage
+        double iavg[3];     // average value of the voltage
+        uint8_t CNT_mode;   //CNT mode (sawtooth 00, inverted sawtooth 01, triangle 10, inverted triangle 11;
+        uint8_t middle_rl;  //middle reload (in case of triangle CNT mode) if 0 reload event at start event of PWM, if 1 reload event at start and at middle
 
     protected:
     private:
@@ -68,9 +71,11 @@ class Inverter
         double time;
         uint16_t divisions;
         uint16_t step;      // step inside pwm cycle
+        uint16_t CNT;      // step inside pwm cycle
         uint16_t ss[3];    // switching state
-        double uavg[3];     // average value of the voltage
-        double iavg[3];     // average value of the voltage
+
+
+
 
 
 

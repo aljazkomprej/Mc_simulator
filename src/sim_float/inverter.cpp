@@ -4,6 +4,8 @@
 #include <stdint.h>
 
 #include "inverter.h"
+#include "test.h"
+#include "stdlib.h"
 
 Inverter::Inverter()
 {
@@ -150,15 +152,16 @@ void Inverter::Calculate_PWM_Cycle(const bemf_t *bemf)
         isum[j]=0;
     }
 
-    for(step=1; step < divisions; step++)
+    for(step=1200; abs(step) <= divisions; step--)
     {
+        CNT=abs(step);
         time += sampling_time;
 
         // calculate phase voltages
         for(k=0; k<3; k++)  // calculate phase voltage for each individual phase
         {
             //if(( step < times_in.tu[k] ) || (step >=times_in.td[k] ) ) //times_in.tu before times_in.td
-            if(( step < times_in.tu[k] ) && (step > times_in.td[k] ) )  //times_in.td before times_in.tu
+            if(( CNT > times_in.tu[k] && step > 0 ) || (CNT < times_in.tu[k] && step < 0) )
             {
                 ss[k]=0;
             }
@@ -166,7 +169,7 @@ void Inverter::Calculate_PWM_Cycle(const bemf_t *bemf)
             {
                 ss[k]=1;
             }
-            u[k]=ss[k]*udc;
+            u[k]=ss[k]*udc-udc/2;
         }
 
         Calculate(u[0],u[1],u[2],bemf->e1,bemf->e2,bemf->e3);
