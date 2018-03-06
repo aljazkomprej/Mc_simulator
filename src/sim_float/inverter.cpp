@@ -111,7 +111,7 @@ double Inverter::GetMeasurementIDC(void)
     idc=0.;
 
     // from the switching state determine dc link current
-    // if ss[n]==0 (bottom switch is on, add this partucular phase current to idc
+    // if ss[n]==0 (bottom switch is on, add this particular phase current to idc
     for(n=0;n<3;n++)
     {
         if( ss[n] == 0 ) idc += i[n];
@@ -161,7 +161,8 @@ void Inverter::Calculate_PWM_Cycle(const bemf_t *bemf)
         for(k=0; k<3; k++)  // calculate phase voltage for each individual phase
         {
             //if(( step < times_in.tu[k] ) || (step >=times_in.td[k] ) ) //times_in.tu before times_in.td
-            if(( CNT > times_in.tu[k] && step > 0 ) || (CNT < times_in.tu[k] && step < 0) )
+            //if(( CNT > times_in.tu[k] && step > 0 ) || (CNT < times_in.tu[k] && step < 0) )
+            if( CNT > times_in.tu[k]  )
             {
                 ss[k]=0;
             }
@@ -169,7 +170,8 @@ void Inverter::Calculate_PWM_Cycle(const bemf_t *bemf)
             {
                 ss[k]=1;
             }
-            u[k]=ss[k]*udc-udc/2;
+            //u[k]=ss[k]*udc-udc/2;
+            u[k]=ss[k]*udc;
         }
 
         Calculate(u[0],u[1],u[2],bemf->e1,bemf->e2,bemf->e3);

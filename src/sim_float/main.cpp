@@ -19,7 +19,7 @@ int main(void)
     std::cout << "Motor control simulator " << std::endl;
 
     Test t;
-    //t.Integrator_Test();
+    //t.Integrator_Test();9
     //t.LPF1_Test();
     //t.Pmsm_Test();
 
