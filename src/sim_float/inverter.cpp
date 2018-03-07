@@ -18,7 +18,7 @@ Inverter::Inverter()
     ua3=uavg[2]-uavg0;
 
     dfile.open("inverter.dat");
-    //print column name in first row
+    //print column name in first rowkoko
     dfile << "time" << " ";     // 1
     dfile << "i[0]" << " " << "i[1]" << " " << "i[2]" << " " ;  // 2 - 4
     dfile << "u1" << " " << "u2" << " " << "u3" << " " ;         // 5 - 7
